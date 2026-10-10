@@ -1,0 +1,16 @@
+[
+  {"id":"F01","description":"Direct task opening: This study/paper or We analyse/analyze/examine","pattern":"^(?:This (?:study|paper)\\b|We (?:analyse|analyze|examine)\\b)"},
+  {"id":"F02","description":"Although ... little gap construction within one sentence","pattern":"\\bAlthough\\b[^.!?]*?\\blittle\\b"},
+  {"id":"F03","description":"Selection-bias or endogeneity vocabulary (design dependent)","pattern":"\\b(?:selection|selectivity|self-selection)[ -](?:corrected|bias(?:es)?)\\b|\\bendogeneity(?:-corrected)?\\b"},
+  {"id":"F04","description":"The (empirical) results show/reveal that","pattern":"\\bThe (?:empirical )?results (?:show|reveal) that\\b"},
+  {"id":"F05","description":"Our findings followed by implication/reporting verb","pattern":"\\bOur findings (?:highlight|underscore|suggest|conclude)\\b"},
+  {"id":"F06","description":"Disaggregated analysis/analyses","pattern":"\\bdisaggregated (?:analysis|analyses)\\b"},
+  {"id":"F07","description":"Homogeneous or source spelling homogenous","pattern":"\\bhomogen(?:e)?ous\\b"},
+  {"id":"F08","description":"Method-labeled results, including results of the ... model","pattern":"\\b(?:the )?(?-i:[A-Z]{2,5}) results\\b|\\bresults of the (?-i:[A-Z]{2,5}) model\\b"},
+  {"id":"F09","description":"More pronounced or larger impact comparative construction","pattern":"\\bmore pronounced\\b|\\blarger impact\\b"},
+  {"id":"F10","description":"Respectively: explicit pairing","pattern":"\\brespectively\\b"},
+  {"id":"F11","description":"Exerts ... impact/effect nominal construction","pattern":"\\bexerts?\\b[^.!?]{0,75}?\\b(?:impact|effect)\\b"},
+  {"id":"F12","description":"In contrast or However: contrast marker","pattern":"\\b(?:In contrast|However)\\b"},
+  {"id":"F13","description":"Such as: examples or explicit outcome list","pattern":"\\bsuch as\\b"},
+  {"id":"F14","description":"This/These result(s)/finding(s) suggests/suggest","pattern":"\\b(?:This|These) (?:results?|findings?) suggests?\\b"}
+]
