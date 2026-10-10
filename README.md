@@ -2,7 +2,7 @@
 
 用经授权的英文论文建立可核查的作者文风画像，再指导新稿写作。第一版在当前对话中工作，不调用模型 API，不进行模型微调。
 
-## 当前版本 v0.1
+## 当前版本 v0.2
 
 已实现：递归登记 PDF、文件哈希、原文逐页提取、页码与文本块坐标保留、完全重复检测、疑似同文不同版本分组、按论文组确定学习/开发/测试分区、基础质量清单、带出处的人工精选语料统计。尚未实现：OCR、可靠的自动章节识别、自动画像推断、生成模型、语义事实核验。
 
@@ -27,6 +27,8 @@ python stylelab.py profile --excerpts local/curated/excerpts.jsonl
 从学习集取段落；对照 PDF 页面确认后，参照 `templates/excerpt.example.json` 写入 `local/curated/excerpts.jsonl`（每行一个 JSON 对象）。必须填写论文 ID、PDF 页序号（从 1 开始）、章节、段落全文及审核状态。程序核对段落确实存在于该页，拒绝开发集/测试集、未审核段落、重复段落以及未知论文。若 PDF 有断词，只允许统一空白与行末连字符；不能凭记忆修订后当作原文。
 
 统计输出 `local/profiles/surface-style.json`。这些仅是词表/正则得到的表层描述，不是文风准确率，也不证明个人作者归属。深层论证习惯由 `prompts/analyze-style.md` 指导当前对话分析，每条规则需要出处和反例。
+
+v0.2 新增精选文件夹登记、目标作者/领域参考角色区分和画像证据核验。用 `profile --selection ... --out ...` 为精选语料单独生成统计，不覆盖早期试验。完整流程见 `docs/selected-corpus-workflow.md`。新稿任务输入模板见 `templates/new-writing-task.md`。作者专用画像与写作指令保存在 `local/profiles/`，不随代码同步。
 
 ## 推荐 Git 工作方式
 

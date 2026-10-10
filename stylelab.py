@@ -193,9 +193,73 @@ def surface_stats(rows):
             "markers_per_1000_words": {w: round(frequencies[w] * 1000 / len(tokens), 2) for w in vocab}}
 
 
-def profile(excerpts, local):
+def select_papers(source, local, output):
+    """Register a selected folder by exact hash, without reading held-out prose."""
+    if not source.is_dir():
+        raise ValueError("Selected directory not found")
+    records = json.loads((local / "manifest.json").read_text(encoding="utf-8"))
+    by_hash = {r["sha256"]: r for r in records}
+    splits = json.loads((local / "splits.json").read_text(encoding="utf-8"))
+    selected, seen = [], set()
+    files = sorted(p for p in source.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
+    for path in files:
+        sha = digest(path)
+        if sha not in by_hash:
+            raise ValueError(f"Unregistered PDF: {path.name}; ingest the complete source before selecting")
+        if sha in seen:
+            continue
+        seen.add(sha)
+        r = by_hash[sha]
+        selected.append({"source": str(path.resolve()), "paper_id": r["paper_id"], "sha256": sha,
+                         "pages": r["pages"], "split": splits[r["paper_id"]],
+                         "role": "pending_authorship_review", "authorship": "unconfirmed"})
+    if not selected:
+        raise ValueError("No selected PDFs")
+    if output.exists():
+        raise ValueError("Selection output exists; use a new filename to preserve human decisions")
+    dump(output, selected)
+    print(json.dumps({"selected": len(selected), "splits": dict(Counter(r["split"] for r in selected))}))
+
+
+def validate_selection(rows, selection):
+    eligible = {r["paper_id"] for r in selection if r.get("role") == "target_learning"}
+    for row in rows:
+        if row["paper_id"] not in eligible:
+            raise ValueError("Excerpt is not from an approved target-learning paper")
+
+
+def verify_sheet(sheet, rows):
+    """Check quote provenance and paper counts; NOT the interpretation of evidence."""
+    by_id = {r["excerpt_id"]: r for r in rows}
+    if len(by_id) != len(rows):
+        raise ValueError("Excerpt IDs must be unique")
+    results = []
+    if not sheet.get("rules"):
+        raise ValueError("No style rules")
+    seen = set()
+    for rule in sheet["rules"]:
+        if rule["id"] in seen:
+            raise ValueError("Duplicate rule ID")
+        seen.add(rule["id"])
+        papers = set()
+        for e in rule["evidence"]:
+            row = by_id[e["excerpt_id"]]
+            if not e["quote"].strip() or normalize(e["quote"]) not in normalize(row["text"]):
+                raise ValueError(f"Unmatched quote in rule {rule['id']}")
+            papers.add(row["paper_id"])
+        if len(papers) != rule["support_papers"] or not papers:
+            raise ValueError(f"Incorrect independent-paper count for {rule['id']}")
+        if rule.get("status") == "cross_paper_observation" and len(papers) < 3:
+            raise ValueError("Cross-paper rules require at least three distinct learning papers")
+        results.append({"rule": rule["id"], "independent_papers": len(papers), "quotes_match": True})
+    return results
+
+
+def profile(excerpts, local, output=None, selection=None):
     rows = [json.loads(line) for line in excerpts.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     validate_excerpts(rows, local)
+    if selection:
+        validate_selection(rows, json.loads(selection.read_text(encoding="utf-8")))
     sections = defaultdict(list)
     for r in rows:
         sections[r["section"]].append(r)
@@ -203,7 +267,7 @@ def profile(excerpts, local):
               "sections": {s: surface_stats(rs) for s, rs in sections.items()},
               "provenance": [{k: r[k] for k in ("paper_id", "page", "section", "authorship")} for r in rows],
               "limitations": "Regex sentence boundaries are approximate. Counts do not measure style accuracy or personal authorship."}
-    dump(local / "profiles" / "surface-style.json", result)
+    dump(output or local / "profiles" / "surface-style.json", result)
     print(json.dumps(result["overall"], indent=2))
 
 
@@ -215,12 +279,32 @@ def main():
     intake.add_argument("--source", type=Path, required=True)
     stats = commands.add_parser("profile")
     stats.add_argument("--excerpts", type=Path, required=True)
+    stats.add_argument("--out", type=Path)
+    stats.add_argument("--selection", type=Path)
+    selection = commands.add_parser("select")
+    selection.add_argument("--source", type=Path, required=True)
+    selection.add_argument("--out", type=Path, required=True)
+    verify = commands.add_parser("verify-sheet")
+    verify.add_argument("--sheet", type=Path, required=True)
+    verify.add_argument("--excerpts", type=Path, required=True)
+    verify.add_argument("--selection", type=Path, required=True)
+    verify.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == "ingest":
             ingest(args.source, args.local)
+        elif args.command == "profile":
+            profile(args.excerpts, args.local, args.out, args.selection)
+        elif args.command == "select":
+            select_papers(args.source, args.local, args.out)
         else:
-            profile(args.excerpts, args.local)
+            rows = [json.loads(line) for line in args.excerpts.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+            validate_excerpts(rows, args.local)
+            validate_selection(rows, json.loads(args.selection.read_text(encoding="utf-8")))
+            result = verify_sheet(json.loads(args.sheet.read_text(encoding="utf-8")), rows)
+            dump(args.out, {"quote_provenance_passed": True, "semantic_interpretation_validated": False,
+                            "rules": result})
+            print(f"Verified {len(result)} rules: quotes and paper counts only")
     except (ValueError, KeyError, OSError) as exc:
         parser.exit(2, f"ERROR: {exc}\n")
 

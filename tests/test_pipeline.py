@@ -4,7 +4,8 @@ import tempfile
 import unittest
 
 import pymupdf
-from stylelab import assign_splits, digest, dump, ingest, normalize, validate_excerpts, version_groups
+from stylelab import (assign_splits, digest, dump, ingest, normalize, select_papers,
+                      validate_excerpts, validate_selection, verify_sheet, version_groups)
 
 TEXT = ("We examine the relationship between service access and household outcomes. "
         "The analysis uses an illustrative sample for a software test only. "
@@ -12,6 +13,23 @@ TEXT = ("We examine the relationship between service access and household outcom
 
 
 class PipelineTests(unittest.TestCase):
+    def test_reference_author_is_not_target_evidence(self):
+        with self.assertRaises(ValueError):
+            validate_selection([{"paper_id": "other-author"}],
+                               [{"paper_id": "other-author", "role": "field_reference"}])
+
+    def test_quote_provenance_and_independent_paper_count(self):
+        rows = [{"excerpt_id": "e1", "paper_id": "p1", "text": TEXT}]
+        rule = {"id": "r1", "support_papers": 1, "status": "tentative",
+                "evidence": [{"excerpt_id": "e1", "quote": "possible association"}]}
+        self.assertEqual(verify_sheet({"rules": [rule]}, rows)[0]["independent_papers"], 1)
+        with self.assertRaises(ValueError):
+            verify_sheet({"rules": [dict(rule, support_papers=3)]}, rows)
+        with self.assertRaises(ValueError):
+            verify_sheet({"rules": [dict(rule, status="cross_paper_observation")]}, rows)
+        with self.assertRaises(ValueError):
+            verify_sheet({"rules": [dict(rule, evidence=[{"excerpt_id": "e1", "quote": "certain effect"}])]}, rows)
+
     def test_soft_line_end_hyphen(self):
         self.assertEqual(normalize("agricul\u00ad\ntural"), "agricultural")
 
@@ -47,6 +65,13 @@ class PipelineTests(unittest.TestCase):
             manifest = json.loads((local / "manifest.json").read_text())
             self.assertEqual(len(manifest), 1)
             self.assertEqual(len(manifest[0]["sources"]), 2)
+            split_before = (local / "splits.json").read_bytes()
+            selected_path = local / "selected.json"
+            select_papers(source, local, selected_path)
+            self.assertEqual(len(json.loads(selected_path.read_text())), 1)
+            self.assertEqual(split_before, (local / "splits.json").read_bytes())
+            with self.assertRaises(ValueError):
+                select_papers(source, local, selected_path)
             pid = manifest[0]["paper_id"]
             row = {"paper_id": pid, "page": 1, "section": "results", "text": TEXT,
                    "reviewed": True, "authorship": "synthetic_fixture"}
