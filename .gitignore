@@ -1,0 +1,12 @@
+# Local corpus, identities, extracts, drafts and credentials never belong in Git.
+/local/
+/.venv/
+/.env
+/.env.*
+!/.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.pdf
+*.docx
+*.zip
